@@ -109,3 +109,14 @@ describe("parseCompetitorBody with served Name: prefix", () => {
     expect(c?.feedOverride).toBe("https://blog.atlan.com/rss.xml");
   });
 });
+
+describe("Name-line pollution is stripped everywhere", () => {
+  it("extractFencedBody drops all leading Name lines", () => {
+    const raw = 'h\n[fenced-content x] marker\nName: Atlan\nName: Atlan\nhttps://atlan.com\n[end fenced-content x]';
+    expect(extractFencedBody(raw)).toBe("https://atlan.com");
+  });
+  it("parser survives multiple embedded Name lines", () => {
+    const c = parseCompetitorBody("Atlan", "e9", "Name: Atlan\nName: Atlan\nhttps://atlan.com");
+    expect(c?.homepage).toBe("https://atlan.com");
+  });
+});

@@ -8,7 +8,12 @@ export function extractFencedBody(raw: string): string | null {
   if (start === -1) return null;
   const end = lines.findIndex((l, i) => i > start && l.startsWith("[end fenced-content"));
   if (end === -1) return null;
-  return lines.slice(start + 1, end).join("\n").trim();
+  const body = lines.slice(start + 1, end);
+  // Drop the server's leading "Name: ..." display line(s): they are serve-
+  // time scaffolding, not authored content. Writing them back into an entry
+  // compounds one copy per cycle.
+  while (body[0]?.trim().toLowerCase().startsWith("name:")) body.shift();
+  return body.join("\n").trim();
 }
 import { isSafeUrl } from "./rss.js";
 import { log } from "./log.js";
@@ -31,7 +36,9 @@ export function parseCompetitorBody(name: string, entryId: string, body: string)
   const lines = body.split("\n").map((l) => l.trim()).filter(Boolean);
   // The server prepends a "Name: ..." display line when serving an entry
   // body (verified live 2026-09-02); the authored content starts after it.
-  if (lines[0]?.toLowerCase().startsWith("name:")) lines.shift();
+  // Skip every leading Name line: bodies written back before this fix may
+  // carry embedded copies.
+  while (lines[0]?.toLowerCase().startsWith("name:")) lines.shift();
   if (lines.length === 0 || !isSafeUrl(lines[0])) return null;
   const competitor: Competitor = { name, entryId, homepage: lines[0] };
   for (const line of lines.slice(1)) {
