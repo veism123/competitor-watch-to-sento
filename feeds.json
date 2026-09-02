@@ -1,0 +1,12 @@
+[
+  {
+    "name": "competitor-posts",
+    "source": "competitor-rss",
+    "targetEntity": "Competitor moves",
+    "schedule": "daily",
+    "options": {
+      "watchListEntity": "Competitors",
+      "lookbackDays": 14
+    }
+  }
+]

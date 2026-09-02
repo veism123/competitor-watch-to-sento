@@ -1,0 +1,9 @@
+node_modules/
+dist/
+
+# Secrets: keys live only here locally and in the deploy host's env vars
+.env
+.env.*
+!.env.example
+
+.DS_Store
