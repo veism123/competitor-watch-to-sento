@@ -7,7 +7,7 @@ import {
   extractFencedBody,
   type Competitor,
 } from "../competitors.js";
-import { COMMON_FEED_PATHS, discoverFeedUrl, isSafeUrl, parseFeed } from "../rss.js";
+import { COMMON_BLOG_PATHS, COMMON_FEED_PATHS, discoverFeedUrl, isSafeUrl, parseBlogIndexLinks, parseFeed } from "../rss.js";
 import { log } from "../log.js";
 
 // Watches each competitor's blog/changelog feed and relays new posts as
@@ -65,6 +65,15 @@ async function resolveFeedUrl(c: Competitor): Promise<string | null> {
   return null;
 }
 
+async function resolveBlogIndex(c: Competitor): Promise<string | null> {
+  for (const path of COMMON_BLOG_PATHS) {
+    const candidate = new URL(path, c.homepage).toString();
+    const html = await fetchText(candidate);
+    if (html && parseBlogIndexLinks(html, candidate).length > 0) return candidate;
+  }
+  return null;
+}
+
 export const competitorRssSource: Source = {
   async fetch(feed: FeedConfig): Promise<SourceItem[]> {
     const opts = (feed.options ?? {}) as Options;
@@ -94,21 +103,38 @@ export const competitorRssSource: Source = {
     const items: EntryItem[] = [];
     for (const c of competitors) {
       const feedUrl = await resolveFeedUrl(c);
-      if (!feedUrl) {
-        log(`[${feed.name}] coverage: ${c.name} — no feed found; add a "feed:" override line to its entry`);
+      let recent: Array<{ title: string; link: string; publishedAt?: string }> = [];
+      let watched: string | null = null;
+      if (feedUrl) {
+        const xml = await fetchText(feedUrl);
+        if (xml) {
+          const posts = parseFeed(xml);
+          recent = posts.filter((p) => !p.publishedAt || new Date(p.publishedAt).getTime() >= since);
+          watched = feedUrl;
+          log(`[${feed.name}] ${c.name}: feed ${feedUrl}, ${posts.length} item(s), ${recent.length} within ${lookbackDays}d`);
+        } else {
+          log(`[${feed.name}] coverage: ${c.name} — feed at ${feedUrl} did not respond`);
+        }
+      }
+      if (!watched) {
+        // No feed: watch the blog index page instead. New links are new
+        // posts (dedupe drops known URLs); publish dates are unknown.
+        const indexUrl = await resolveBlogIndex(c);
+        if (indexUrl) {
+          const html = await fetchText(indexUrl);
+          if (html) {
+            recent = parseBlogIndexLinks(html, indexUrl).slice(0, 30);
+            watched = indexUrl;
+            log(`[${feed.name}] ${c.name}: no feed; watching index ${indexUrl}, ${recent.length} post link(s)`);
+          }
+        }
+      }
+      if (!watched) {
+        log(`[${feed.name}] coverage: ${c.name} — no feed or blog index found; add a "feed:" override line to its entry`);
         await writeCoverage(sento, listId, c, null);
         continue;
       }
-      const xml = await fetchText(feedUrl);
-      if (!xml) {
-        log(`[${feed.name}] coverage: ${c.name} — feed at ${feedUrl} did not respond`);
-        await writeCoverage(sento, listId, c, feedUrl);
-        continue;
-      }
-      const posts = parseFeed(xml);
-      const recent = posts.filter((p) => !p.publishedAt || new Date(p.publishedAt).getTime() >= since);
-      log(`[${feed.name}] ${c.name}: feed ${feedUrl}, ${posts.length} item(s), ${recent.length} within ${lookbackDays}d`);
-      await writeCoverage(sento, listId, c, feedUrl);
+      await writeCoverage(sento, listId, c, watched);
 
       for (const post of recent) {
         if (!isSafeUrl(post.link)) continue;
@@ -118,7 +144,7 @@ export const competitorRssSource: Source = {
           sourceId: post.link,
           name: `${sanitize(c.name, 30)} — ${date} — ${sanitize(post.title, 60)}`.slice(0, 120).trim(),
           body:
-            `${c.name} — blog/changelog post — published ${post.publishedAt ?? "date unknown"} — ${post.link}\n\n` +
+            `${c.name} — blog/changelog post — published ${"publishedAt" in post && post.publishedAt ? post.publishedAt : "date unknown"} — ${post.link}\n\n` +
             `${post.title}`,
           ...(post.publishedAt ? { occurredAt: post.publishedAt.replace(/\.\d+Z$/, "Z") } : {}),
           structured: { source: "competitor-watch", competitor: c.name, url: post.link },

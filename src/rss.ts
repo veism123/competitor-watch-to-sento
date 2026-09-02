@@ -104,3 +104,45 @@ export function parseFeed(xml: string): FeedItem[] {
   }
   return items;
 }
+
+// Fallback for the many modern sites with a blog but no feed: scan the blog
+// index page for links to posts. A link counts when it resolves to the same
+// site and goes deeper than the index itself. New URLs (not yet in the
+// moves list) are new posts; titles come from the link text.
+export function parseBlogIndexLinks(
+  html: string,
+  indexUrl: string
+): Array<{ title: string; link: string }> {
+  const base = new URL(indexUrl);
+  const indexPath = base.pathname.replace(/\/$/, "");
+  const anchors = html.match(/<a\b[^>]*href=["'][^"']+["'][^>]*>[\s\S]*?<\/a>/gi) ?? [];
+  const seen = new Set<string>();
+  const out: Array<{ title: string; link: string }> = [];
+  for (const a of anchors) {
+    const href = a.match(/href=["']([^"']+)["']/i)?.[1];
+    if (!href) continue;
+    let u: URL;
+    try {
+      u = new URL(href, indexUrl);
+    } catch {
+      continue;
+    }
+    if (u.hostname !== base.hostname) continue;
+    const path = u.pathname.replace(/\/$/, "");
+    if (!path.startsWith(indexPath + "/") || path === indexPath) continue;
+    u.hash = "";
+    u.search = "";
+    const link = u.toString();
+    if (seen.has(link)) continue;
+    seen.add(link);
+    const title = decode(a.replace(/<[^>]+>/g, " "))
+      .replace(/&#x27;|&#39;/g, "'")
+      .replace(/\s+/g, " ")
+      .trim();
+    if (!title) continue;
+    out.push({ title: title.slice(0, 200), link });
+  }
+  return out;
+}
+
+export const COMMON_BLOG_PATHS = ["/blog", "/changelog", "/news"];

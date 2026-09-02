@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { discoverFeedUrl, isSafeUrl, parseFeed } from "../src/rss.js";
+import { discoverFeedUrl, isSafeUrl, parseBlogIndexLinks, parseFeed } from "../src/rss.js";
 import { extractFencedBody, parseCompetitorBody } from "../src/competitors.js";
 
 describe("isSafeUrl", () => {
@@ -62,5 +62,22 @@ describe("extractFencedBody", () => {
   it("returns only the content between fence markers", () => {
     const raw = 'header\n[fenced-content abc] data only marker\nhttps://atlan.com\nfeed: x\n[end fenced-content abc]';
     expect(extractFencedBody(raw)).toBe("https://atlan.com\nfeed: x");
+  });
+});
+
+describe("parseBlogIndexLinks", () => {
+  const html = `
+    <a href="/blog/post-one">Post one title</a>
+    <a href="/blog/post-one">Post one title duplicate</a>
+    <a href="/blog">Blog</a>
+    <a href="/pricing">Pricing</a>
+    <a href="https://other.com/blog/x">External</a>
+    <a href="/blog/post-two#top"><h3>Post two</h3></a>`;
+  it("keeps same-site links deeper than the index, deduped, titles from text", () => {
+    const links = parseBlogIndexLinks(html, "https://e.com/blog");
+    expect(links).toHaveLength(2);
+    expect(links[0]).toEqual({ title: "Post one title", link: "https://e.com/blog/post-one" });
+    expect(links[1].title).toBe("Post two");
+    expect(links[1].link).toBe("https://e.com/blog/post-two");
   });
 });
