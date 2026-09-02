@@ -81,3 +81,12 @@ describe("parseBlogIndexLinks", () => {
     expect(links[1].link).toBe("https://e.com/blog/post-two");
   });
 });
+
+describe("parseBlogIndexLinks sibling-prefix paths", () => {
+  it("accepts /blog-articles/x from a /blog index", () => {
+    const html = '<a href="/blog-articles/series-c">Raises Series C</a>';
+    const links = parseBlogIndexLinks(html, "https://e.com/blog");
+    expect(links).toHaveLength(1);
+    expect(links[0].link).toBe("https://e.com/blog-articles/series-c");
+  });
+});

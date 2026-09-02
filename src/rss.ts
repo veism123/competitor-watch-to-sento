@@ -116,8 +116,7 @@ export function parseBlogIndexLinks(
   const base = new URL(indexUrl);
   const indexPath = base.pathname.replace(/\/$/, "");
   const anchors = html.match(/<a\b[^>]*href=["'][^"']+["'][^>]*>[\s\S]*?<\/a>/gi) ?? [];
-  const seen = new Set<string>();
-  const out: Array<{ title: string; link: string }> = [];
+  const byLink = new Map<string, { title: string; link: string }>();
   for (const a of anchors) {
     const href = a.match(/href=["']([^"']+)["']/i)?.[1];
     if (!href) continue;
@@ -129,20 +128,26 @@ export function parseBlogIndexLinks(
     }
     if (u.hostname !== base.hostname) continue;
     const path = u.pathname.replace(/\/$/, "");
-    if (!path.startsWith(indexPath + "/") || path === indexPath) continue;
+    // Posts usually live under the index path (/blog/x) but some sites use
+    // a sibling prefix (/blog-articles/x); accept both.
+    const under = path.startsWith(indexPath + "/") || path.startsWith(indexPath + "-");
+    if (!under || path === indexPath) continue;
     u.hash = "";
     u.search = "";
     const link = u.toString();
-    if (seen.has(link)) continue;
-    seen.add(link);
     const title = decode(a.replace(/<[^>]+>/g, " "))
       .replace(/&#x27;|&#39;/g, "'")
       .replace(/\s+/g, " ")
       .trim();
     if (!title) continue;
-    out.push({ title: title.slice(0, 200), link });
+    const existing = byLink.get(link);
+    // The same post is often linked twice (card + "Read more"); keep the
+    // longer, more descriptive text as the title.
+    if (!existing || title.length > existing.title.length) {
+      byLink.set(link, { title: title.slice(0, 200), link });
+    }
   }
-  return out;
+  return [...byLink.values()];
 }
 
 export const COMMON_BLOG_PATHS = ["/blog", "/changelog", "/news"];
