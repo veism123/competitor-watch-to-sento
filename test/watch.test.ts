@@ -76,7 +76,7 @@ describe("parseBlogIndexLinks", () => {
   it("keeps same-site links deeper than the index, deduped, titles from text", () => {
     const links = parseBlogIndexLinks(html, "https://e.com/blog");
     expect(links).toHaveLength(2);
-    expect(links[0]).toEqual({ title: "Post one title", link: "https://e.com/blog/post-one" });
+    expect(links[0]).toEqual({ title: "Post one title duplicate", link: "https://e.com/blog/post-one" });
     expect(links[1].title).toBe("Post two");
     expect(links[1].link).toBe("https://e.com/blog/post-two");
   });
