@@ -15,9 +15,9 @@ import { log, logError } from "./log.js";
 const BRIEF_ENTITY = process.env.BRIEF_ENTITY ?? "Competitive brief";
 // Cost controls. The analyst runs at most once per week (the entry-name
 // dedupe enforces it); these bound what one run may spend. Rough ceiling
-// per run at defaults: ~10 searches ($0.01 each) plus input/output tokens,
+// per run at defaults: ~30 searches ($0.01 each) plus input/output tokens,
 // typically well under $1. Actual usage is logged after every run.
-const MAX_SEARCHES = Number(process.env.ANALYST_MAX_SEARCHES ?? "10");
+const MAX_SEARCHES = Number(process.env.ANALYST_MAX_SEARCHES ?? "30");
 const MAX_OUTPUT_TOKENS = Number(process.env.ANALYST_MAX_TOKENS ?? "16000");
 const MOVES_ENTITY = process.env.MOVES_ENTITY ?? "Competitor moves";
 const WATCHLIST_ENTITY = process.env.WATCHLIST_ENTITY ?? "Competitors";
