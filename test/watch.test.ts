@@ -90,3 +90,14 @@ describe("parseBlogIndexLinks sibling-prefix paths", () => {
     expect(links[0].link).toBe("https://e.com/blog-articles/series-c");
   });
 });
+
+describe("isoWeekLabel", () => {
+  it("labels the completed week, Tuesday after", async () => {
+    const { isoWeekLabel } = await import("../src/analyst.js");
+    expect(isoWeekLabel(new Date("2026-09-02T10:00:00Z"))).toBe("Week 2026-W35");
+  });
+  it("on a Monday labels the week that just ended", async () => {
+    const { isoWeekLabel } = await import("../src/analyst.js");
+    expect(isoWeekLabel(new Date("2026-08-31T08:00:00Z"))).toBe("Week 2026-W35");
+  });
+});

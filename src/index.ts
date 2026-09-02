@@ -2,6 +2,7 @@ import { loadConfig } from "./config.js";
 import { SentoClient } from "./sento.js";
 import { runAllFeeds } from "./pipeline.js";
 import { loadFeeds } from "./feeds.js";
+import { runAnalyst } from "./analyst.js";
 import { log, logError } from "./log.js";
 
 const config = loadConfig();
@@ -17,6 +18,7 @@ const sento = config.dryRun ? null : new SentoClient(config.sentoMcpUrl, config.
 // after the sources have complete data for yesterday. The marker is process
 // memory only: a restart re-runs them once, which dedupe makes harmless.
 let lastDailyDate = "";
+let lastAnalystDate = "";
 
 async function cycle(): Promise<void> {
   try {
@@ -26,6 +28,12 @@ async function cycle(): Promise<void> {
     if (dailyFeeds.length > 0 && today !== lastDailyDate && now.getUTCHours() >= 7) {
       lastDailyDate = today;
       await runAllFeeds(dailyFeeds, sento, config.dryRun);
+    }
+    // The analyst runs Mondays after 07:00 UTC. Its entry-name dedupe makes
+    // restarts harmless: at most one brief per week regardless.
+    if (now.getUTCDay() === 1 && now.getUTCHours() >= 7 && today !== lastAnalystDate) {
+      lastAnalystDate = today;
+      await runAnalyst();
     }
   } catch (err) {
     logError("cycle failed", err);
