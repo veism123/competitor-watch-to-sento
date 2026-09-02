@@ -47,6 +47,14 @@ log(
 if (once) {
   // Supervision runs everything, schedules ignored.
   await runAllFeeds(feeds, sento, config.dryRun);
+} else if (process.env.RUN_ANALYST_ON_BOOT === "true") {
+  // One-shot cloud trigger for a supervised analyst run: set the env var,
+  // redeploy, read the brief, remove the var. The weekly dedupe still
+  // applies, so leaving it set cannot produce duplicate briefs.
+  log("RUN_ANALYST_ON_BOOT is set: running the analyst now");
+  await runAnalyst();
+  await cycle();
+  setInterval(cycle, config.pollMinutes * 60_000);
 } else {
   await cycle();
   setInterval(cycle, config.pollMinutes * 60_000);
