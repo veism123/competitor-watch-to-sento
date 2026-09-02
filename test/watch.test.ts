@@ -101,3 +101,11 @@ describe("isoWeekLabel", () => {
     expect(isoWeekLabel(new Date("2026-08-31T08:00:00Z"))).toBe("Week 2026-W35");
   });
 });
+
+describe("parseCompetitorBody with served Name: prefix", () => {
+  it("skips the server-added Name line", () => {
+    const c = parseCompetitorBody("Atlan", "e9", "Name: Atlan\nhttps://atlan.com\nfeed: https://blog.atlan.com/rss.xml");
+    expect(c?.homepage).toBe("https://atlan.com");
+    expect(c?.feedOverride).toBe("https://blog.atlan.com/rss.xml");
+  });
+});

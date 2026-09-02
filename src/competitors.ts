@@ -29,6 +29,9 @@ export interface Competitor {
 
 export function parseCompetitorBody(name: string, entryId: string, body: string): Competitor | null {
   const lines = body.split("\n").map((l) => l.trim()).filter(Boolean);
+  // The server prepends a "Name: ..." display line when serving an entry
+  // body (verified live 2026-09-02); the authored content starts after it.
+  if (lines[0]?.toLowerCase().startsWith("name:")) lines.shift();
   if (lines.length === 0 || !isSafeUrl(lines[0])) return null;
   const competitor: Competitor = { name, entryId, homepage: lines[0] };
   for (const line of lines.slice(1)) {
