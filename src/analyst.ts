@@ -72,7 +72,12 @@ export async function runAnalyst(): Promise<void> {
     `## The entry's authoring guide\n${guide}\n\n` +
     `Today is ${new Date().toISOString().slice(0, 10)}. Research and write the brief now.`;
 
-  const client = new Anthropic({ apiKey });
+  // Identity-linked API keys require the workspace id on every request.
+  const workspaceId = process.env.ANTHROPIC_WORKSPACE_ID;
+  const client = new Anthropic({
+    apiKey,
+    ...(workspaceId ? { defaultHeaders: { "anthropic-workspace-id": workspaceId } } : {}),
+  });
   const messages: Anthropic.Beta.BetaMessageParam[] = [{ role: "user", content: task }];
   let text = "";
   let inputTokens = 0;

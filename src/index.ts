@@ -33,7 +33,11 @@ async function cycle(): Promise<void> {
     // restarts harmless: at most one brief per week regardless.
     if (now.getUTCDay() === 1 && now.getUTCHours() >= 7 && today !== lastAnalystDate) {
       lastAnalystDate = today;
-      await runAnalyst();
+      try {
+        await runAnalyst();
+      } catch (err) {
+        logError("analyst run failed (collector continues)", err);
+      }
     }
   } catch (err) {
     logError("cycle failed", err);
@@ -52,7 +56,11 @@ if (once) {
   // redeploy, read the brief, remove the var. The weekly dedupe still
   // applies, so leaving it set cannot produce duplicate briefs.
   log("RUN_ANALYST_ON_BOOT is set: running the analyst now");
-  await runAnalyst();
+  try {
+    await runAnalyst();
+  } catch (err) {
+    logError("analyst run failed (collector continues)", err);
+  }
   await cycle();
   setInterval(cycle, config.pollMinutes * 60_000);
 } else {
