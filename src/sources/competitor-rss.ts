@@ -148,7 +148,11 @@ export const competitorRssSource: Source = {
             `${post.title}`,
           ...(post.publishedAt ? { occurredAt: post.publishedAt.replace(/\.\d+Z$/, "Z") } : {}),
           structured: { source: "competitor-watch", competitor: c.name, url: post.link },
-          dedupeKey: post.link,
+          // Dedupe against what the entry index actually shows: names. The
+          // sanitized title is a stable substring of the entry name across
+          // runs (dates on index-scraped items are seen-dates and vary), so
+          // it is the reliable key; the URL stays in structured for audit.
+          dedupeKey: sanitize(post.title, 60),
         });
       }
     }
