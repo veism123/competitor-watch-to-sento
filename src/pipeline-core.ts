@@ -2,6 +2,11 @@ import type { FeedConfig, Source } from "./types.js";
 import { SentoClient } from "./sento.js";
 import { log, logError } from "./log.js";
 
+// Work counters for the daily heartbeat value. Process-local: a restart
+// resets them, which only makes one beat's numbers conservative.
+let cyclesSinceBeat = 0;
+let writesSinceBeat = 0;
+
 // A metric read displays its latest observation ("observed_at: ..."). That
 // timestamp is the high-water mark: only observations after it are written,
 // which makes re-runs and backfills idempotent with no local state.
@@ -69,6 +74,7 @@ export async function runFeed(
         value: item.value,
         observedAt: item.observedAt,
       });
+      writesSinceBeat++;
       log(`[${feed.name}] wrote observation ${item.sourceId}`, { server: result.slice(0, 200) });
       continue;
     }
@@ -93,6 +99,7 @@ export async function runFeed(
       occurredAt: item.occurredAt,
       structured: item.structured,
     });
+    writesSinceBeat++;
     log(`[${feed.name}] wrote entry ${item.sourceId}`, { server: result.slice(0, 200) });
   }
 }
@@ -113,25 +120,32 @@ export async function runAllFeeds(
   await writeHeartbeat(sento, dryRun);
 }
 
-// After every cycle, record "the courier ran" in a metric named by
-// HEARTBEAT_ENTITY (skipped when unset). Give that entity a daily cadence
-// in the console: a dead courier then surfaces as a visibly stale entity,
-// using Sento's own freshness machinery instead of separate alerting.
+// Heartbeat: at most one write per day into the metric named by
+// HEARTBEAT_ENTITY (skipped when unset), carrying the work done since the
+// last beat as its value. Give that entity a daily cadence in the console:
+// a dead courier surfaces as a visibly stale entity within a day or two,
+// using Sento's own freshness machinery, without hourly telemetry noise.
+const HEARTBEAT_MIN_INTERVAL_MS = 20 * 3600_000;
+
 async function writeHeartbeat(sento: SentoClient | null, dryRun: boolean): Promise<void> {
   const name = process.env.HEARTBEAT_ENTITY;
   if (!name) return;
-  if (dryRun || !sento) {
-    log(`[heartbeat] DRY RUN would write to "${name}"`);
-    return;
-  }
+  cyclesSinceBeat++;
+  if (dryRun || !sento) return;
   try {
     const entityId = await sento.findEntityIdByName(name);
+    const existing = await sento.readEntity(entityId);
+    const lastBeat = latestObservedAt(existing);
+    if (lastBeat && Date.now() - lastBeat.getTime() < HEARTBEAT_MIN_INTERVAL_MS) return;
+    const value = `ok: ${cyclesSinceBeat} cycle(s), ${writesSinceBeat} write(s) since last beat`;
     const result = await sento.writeMetric({
       entityId,
-      value: "ok",
+      value,
       observedAt: new Date().toISOString().replace(/\.\d+Z$/, "Z"),
     });
-    log(`[heartbeat] wrote`, { server: result.slice(0, 120) });
+    cyclesSinceBeat = 0;
+    writesSinceBeat = 0;
+    log(`[heartbeat] wrote`, { server: result.slice(0, 140) });
   } catch (err) {
     logError(`[heartbeat] failed`, err);
   }

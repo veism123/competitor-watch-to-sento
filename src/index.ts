@@ -2,7 +2,6 @@ import { loadConfig } from "./config.js";
 import { SentoClient } from "./sento.js";
 import { runAllFeeds } from "./pipeline.js";
 import { loadFeeds } from "./feeds.js";
-import { runAnalyst } from "./analyst.js";
 import { log, logError } from "./log.js";
 
 const config = loadConfig();
@@ -18,7 +17,6 @@ const sento = config.dryRun ? null : new SentoClient(config.sentoMcpUrl, config.
 // after the sources have complete data for yesterday. The marker is process
 // memory only: a restart re-runs them once, which dedupe makes harmless.
 let lastDailyDate = "";
-let lastAnalystDate = "";
 
 async function cycle(): Promise<void> {
   try {
@@ -28,16 +26,6 @@ async function cycle(): Promise<void> {
     if (dailyFeeds.length > 0 && today !== lastDailyDate && now.getUTCHours() >= 7) {
       lastDailyDate = today;
       await runAllFeeds(dailyFeeds, sento, config.dryRun);
-    }
-    // The analyst runs Mondays after 07:00 UTC. Its entry-name dedupe makes
-    // restarts harmless: at most one brief per week regardless.
-    if (now.getUTCDay() === 1 && now.getUTCHours() >= 7 && today !== lastAnalystDate) {
-      lastAnalystDate = today;
-      try {
-        await runAnalyst();
-      } catch (err) {
-        logError("analyst run failed (collector continues)", err);
-      }
     }
   } catch (err) {
     logError("cycle failed", err);
@@ -51,18 +39,6 @@ log(
 if (once) {
   // Supervision runs everything, schedules ignored.
   await runAllFeeds(feeds, sento, config.dryRun);
-} else if (process.env.RUN_ANALYST_ON_BOOT === "true") {
-  // One-shot cloud trigger for a supervised analyst run: set the env var,
-  // redeploy, read the brief, remove the var. The weekly dedupe still
-  // applies, so leaving it set cannot produce duplicate briefs.
-  log("RUN_ANALYST_ON_BOOT is set: running the analyst now");
-  try {
-    await runAnalyst();
-  } catch (err) {
-    logError("analyst run failed (collector continues)", err);
-  }
-  await cycle();
-  setInterval(cycle, config.pollMinutes * 60_000);
 } else {
   await cycle();
   setInterval(cycle, config.pollMinutes * 60_000);
