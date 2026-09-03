@@ -20,8 +20,10 @@ Rules, in priority order:
 6. If no positioning context was provided, state in one line that the
    positioning check was skipped this week.
 7. Follow the entry structure from the authoring guide provided in the
-   task. Keep the body under 600 words. No em dashes. Write plainly, like
-   a sharp analyst talking to their own team, not a news anchor.
+   task exactly: it defines a scannable bullet format (uppercase section
+   headers, bold two-line bullets, under 250 words total). Never write
+   paragraphs. No em dashes in your own prose. Write like a sharp analyst
+   whose reader has thirty seconds.
 
 Output only the brief body text, ready to store. No preamble, no
 meta-commentary about what you are about to do.
