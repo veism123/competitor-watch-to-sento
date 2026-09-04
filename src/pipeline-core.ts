@@ -1,6 +1,7 @@
 import type { FeedConfig, Source } from "./types.js";
 import { SentoClient } from "./sento.js";
 import { log, logError } from "./log.js";
+import { notifySlack } from "./notify.js";
 
 // Work counters for the daily heartbeat value. Process-local: a restart
 // resets them, which only makes one beat's numbers conservative.
@@ -26,6 +27,7 @@ export async function runFeed(
   dryRun: boolean,
   sources: Record<string, Source>
 ): Promise<void> {
+  let written = 0;
   const source = sources[feed.source];
   if (!source) {
     throw new Error(`[${feed.name}] unknown source "${feed.source}" (known: ${Object.keys(sources).join(", ")})`);
@@ -75,6 +77,7 @@ export async function runFeed(
         observedAt: item.observedAt,
       });
       writesSinceBeat++;
+      written++;
       log(`[${feed.name}] wrote observation ${item.sourceId}`, { server: result.slice(0, 200) });
       continue;
     }
@@ -100,8 +103,17 @@ export async function runFeed(
       structured: item.structured,
     });
     writesSinceBeat++;
+    written++;
     log(`[${feed.name}] wrote entry ${item.sourceId}`, { server: result.slice(0, 200) });
   }
+  await pingIfProductive(feed, written, dryRun);
+}
+
+// One ping per cycle per feed that produced something, never for quiet
+// cycles: "granola-transcripts: 2 new in Customer meeting transcripts".
+async function pingIfProductive(feed: FeedConfig, written: number, dryRun: boolean): Promise<void> {
+  if (dryRun || written === 0) return;
+  await notifySlack(`${feed.name}: ${written} new in ${feed.targetEntity} (Sento)`);
 }
 
 export async function runAllFeeds(
