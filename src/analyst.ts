@@ -4,6 +4,7 @@ import { fileURLToPath } from "node:url";
 import { loadConfig } from "./config.js";
 import { SentoClient } from "./sento.js";
 import { log, logError } from "./log.js";
+import { notifySlack } from "./notify.js";
 
 // The weekly analyst: the one place in this service that calls a model.
 // It reads the week's collected Competitor moves and the watch list from
@@ -132,4 +133,5 @@ export async function runAnalyst(): Promise<void> {
     structured: { source: "competitor-watch-analyst", model: "claude-opus-5" },
   });
   log(`[analyst] wrote "${entryName}"`, { server: result.slice(0, 160) });
+  await notifySlack(`${entryName} is ready in Sento (${BRIEF_ENTITY}).`);
 }
