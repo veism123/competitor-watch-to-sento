@@ -75,6 +75,12 @@ export class SentoClient {
     });
   }
 
+  // The workspace's own skills: no id returns the index, an id returns one
+  // skill's body. Ids come from the index, never guessed.
+  async getSkill(id?: string): Promise<string> {
+    return this.call("get_skill", id ? { id } : {});
+  }
+
   // The workspace's own composing conventions for the entity. Readable by any
   // caller permitted to write it, so the courier key can fetch it; a person
   // reviews it once and encodes its rules in this courier's config.
